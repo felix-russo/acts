@@ -6,7 +6,6 @@ import acts
 from acts.examples import (
     Sequencer,
     ParticleSelector,
-    ParticleSmearing,
     TrackParameterSelector,
 )
 from acts.examples.simulation import addPythia8
@@ -21,82 +20,72 @@ u = acts.UnitConstants
 def runVertexFitting(
     field,
     outputDir: Path,
-    outputRoot: bool = True,
+    outputRoot: bool = True,  # TODO: You don't really need this boolean, you can just write outputDir = None if you don't want to save the result
     inputParticlePath: Optional[Path] = None,
     inputTrackSummary: Path = None,
-    vertexFinder: VertexFinder = VertexFinder.Truth,
+    vertexFinder: VertexFinder = "AMVF",  # VertexFinder.Truth,
     s=None,
 ):
     s = s or Sequencer(events=100, numThreads=-1)
 
     logger = acts.logging.getLogger("VertexFittingExample")
 
-    rnd = acts.examples.RandomNumbers(seed=42)
-
     inputParticles = "particles_input"
     if inputParticlePath is None:
-        logger.info("Generating particles using Pythia8")
-        addPythia8(s, rnd)
-    else:
-        logger.info("Reading particles from %s", inputParticlePath.resolve())
-        assert inputParticlePath.exists()
-        s.addReader(
-            acts.examples.RootParticleReader(
-                level=acts.logging.INFO,
-                filePath=str(inputParticlePath.resolve()),
-                particleCollection=inputParticles,
-                orderedEvents=False,
-            )
+        logger.error("Please provide a path to the truth information.")
+        return
+    logger.info("Reading particles from %s", inputParticlePath.resolve())
+    assert inputParticlePath.exists()
+    s.addReader(
+        acts.examples.RootParticleReader(
+            level=acts.logging.INFO,
+            filePath=str(inputParticlePath.resolve()),
+            particleCollection=inputParticles,
+            orderedEvents=False,
         )
+    )
 
+    # TODO: Here you can apply cuts to the truth particles (you need to modify the parameters to suit your needs)
     selectedParticles = "particles_selected"
     ptclSelector = ParticleSelector(
         level=acts.logging.INFO,
         inputParticles=inputParticles,
         outputParticles=selectedParticles,
         removeNeutral=True,
-        absEtaMax=2.5,
-        rhoMax=4.0 * u.mm,
-        ptMin=500 * u.MeV,
+        absEtaMax=2.5,  # 2.5
+        rhoMax=999999.0 * u.mm,
+        ptMin=0 * u.MeV,
     )
     s.addAlgorithm(ptclSelector)
 
     trackParameters = "fittedTrackParameters"
 
-    if inputTrackSummary is None or inputParticlePath is None:
-        logger.info("Using smeared particles")
+    if inputTrackSummary is None:
+        logger.error("Please provide a path to the input track summary.")
+        return
+    logger.info("Reading track summary from %s", inputTrackSummary.resolve())
+    assert inputTrackSummary.exists()
+    associatedParticles = "associatedTruthParticles"
+    trackSummaryReader = acts.examples.RootTrajectorySummaryReader(
+        level=acts.logging.VERBOSE,
+        outputTracks=trackParameters,
+        outputParticles=associatedParticles,
+        filePath=str(inputTrackSummary.resolve()),
+        orderedEvents=False,
+    )
+    s.addReader(trackSummaryReader)
 
-        ptclSmearing = ParticleSmearing(
-            level=acts.logging.INFO,
-            inputParticles=selectedParticles,
-            outputTrackParameters=trackParameters,
-            randomNumbers=rnd,
-        )
-        s.addAlgorithm(ptclSmearing)
-        associatedParticles = selectedParticles
-    else:
-        logger.info("Reading track summary from %s", inputTrackSummary.resolve())
-        assert inputTrackSummary.exists()
-        associatedParticles = "associatedTruthParticles"
-        trackSummaryReader = acts.examples.RootTrajectorySummaryReader(
-            level=acts.logging.VERBOSE,
-            outputTracks=trackParameters,
-            outputParticles=associatedParticles,
-            filePath=str(inputTrackSummary.resolve()),
-            orderedEvents=False,
-        )
-        s.addReader(trackSummaryReader)
-
-        trackParamSelector = TrackParameterSelector(
-            level=acts.logging.INFO,
-            inputTrackParameters=trackSummaryReader.config.outputTracks,
-            outputTrackParameters="selectedTrackParameters",
-            absEtaMax=2.5,
-            loc0Max=4.0 * u.mm,  # rho max
-            ptMin=500 * u.MeV,
-        )
-        s.addAlgorithm(trackParamSelector)
-        trackParameters = trackParamSelector.config.outputTrackParameters
+    # TODO: Here you can apply cuts to the track parameters (you need to modify the parameters to suit your needs)
+    trackParamSelector = TrackParameterSelector(
+        level=acts.logging.INFO,
+        inputTrackParameters=trackSummaryReader.config.outputTracks,
+        outputTrackParameters="selectedTrackParameters",
+        absEtaMax=100,
+        loc0Max=1000.0 * u.mm,  # rho max
+        ptMin=0.0 * u.MeV,
+    )
+    s.addAlgorithm(trackParamSelector)
+    trackParameters = trackParamSelector.config.outputTrackParameters
 
     logger.info("Using vertex finder: %s", vertexFinder.name)
 
@@ -104,7 +93,7 @@ def runVertexFitting(
         s,
         field,
         trackParameters=trackParameters,
-        associatedParticles=associatedParticles,
+        associatedParticles=inputParticles,
         trajectories=None,
         vertexFinder=vertexFinder,
         outputDirRoot=outputDir if outputRoot else None,
@@ -114,25 +103,24 @@ def runVertexFitting(
 
 
 if "__main__" == __name__:
-    detector, trackingGeometry, decorators = acts.examples.GenericDetector.create()
+    # TODO: Did you run a simulation without B field? If not, you need to provide the correct field here.
+    field = acts.ConstantBField(acts.Vector3(0, 0, 0 * u.T))
 
-    field = acts.ConstantBField(acts.Vector3(0, 0, 2 * u.T))
-
-    inputParticlePath = Path("particles.root")
+    inputParticlePath = Path("/home/frusso/hep/out/billy/particles_python.root")
     if not inputParticlePath.exists():
-        inputParticlePath = None
+        print("Fatal: Input particle path does not exist.")
+        quit()
 
-    inputTrackSummary = None
-    for p in ("tracksummary_fitter.root", "tracksummary_ckf.root"):
-        p = Path(p)
-        if p.exists():
-            inputTrackSummary = p
-            break
+    inputTrackSummary = Path("/home/frusso/hep/out/billy/tracksummary_python.root")
+    if not inputTrackSummary.exists():
+        print("Fatal: Input track summary path does not exist.")
+        quit()
 
+    outputDir = Path("/home/frusso/hep/out/billy/")
     runVertexFitting(
         field,
-        vertexFinder=VertexFinder.Truth,
+        vertexFinder=VertexFinder.Iterative,
         inputParticlePath=inputParticlePath,
         inputTrackSummary=inputTrackSummary,
-        outputDir=Path.cwd(),
+        outputDir=outputDir,
     ).run()
