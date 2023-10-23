@@ -67,7 +67,7 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
                     0.0125 * u.mm, 0.0125 * u.mm, 55.5 * u.mm, 1.0 * u.ns
                 ),
             ),
-            multiplicity=10,
+            multiplicity=50,
             rnd=rnd,
         )
 
