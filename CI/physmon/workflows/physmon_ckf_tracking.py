@@ -42,7 +42,7 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
         s = acts.examples.Sequencer(
             events=5,
             numThreads=-1,
-            logLevel=acts.logging.INFO,
+            logLevel=acts.logging.DEBUG,
             fpeMasks=acts.examples.Sequencer.FpeMask.fromFile(
                 Path(__file__).parent.parent / "fpe_masks.yml"
             ),
@@ -67,7 +67,7 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
                     0.0125 * u.mm, 0.0125 * u.mm, 55.5 * u.mm, 1.0 * u.ns
                 ),
             ),
-            multiplicity=10,
+            multiplicity=50,
             rnd=rnd,
         )
 
