@@ -98,6 +98,13 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
   return seedVec;
 }
 
+  /// @brief function for saving a DensityMap
+  template <int trkGridSize, typename vfitter_t>
+  void saveDensityMap(std::string path) const {
+    //define ostream
+    returnö
+  }
+
 template <int trkGridSize, typename vfitter_t>
 auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::
     doesPassTrackSelection(const BoundTrackParameters& trk) const -> bool {

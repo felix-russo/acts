@@ -97,6 +97,7 @@ typename Acts::AdaptiveGridTrackDensity<spatialTrkGridSize,
 Acts::AdaptiveGridTrackDensity<spatialTrkGridSize, temporalTrkGridSize>::
     addTrack(const Acts::BoundTrackParameters& trk,
              DensityMap& mainDensityMap) const {
+  // TODO check if track is calculated wrt coordinate system origin?
   ActsVector<3> impactParams = trk.impactParameters();
   ActsSquareMatrix<3> cov = trk.impactParameterCovariance().value();
 

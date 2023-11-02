@@ -145,6 +145,9 @@ class AdaptiveGridDensityVertexFinder {
       const std::function<BoundTrackParameters(InputTrack_t)>& func)
       : m_extractParameters(func) {}
 
+  /// @brief function for saving a DensityMap
+  void saveDensityMap(std::string path) const;
+  
  private:
   /// @brief Checks if a track passes the selection criteria for seeding
   ///
