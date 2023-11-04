@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <fstream>
 #include <ios>
 #include <limits>
 #include <map>
@@ -239,6 +240,18 @@ ActsExamples::ProcessCode ActsExamples::VertexPerformanceWriter::writeT(
 
   // Read truth particle input collection
   const auto& allTruthParticles = m_inputAllTruthParticles(ctx);
+  unsigned int nParticlesPerVertex = 4;
+  unsigned int count = 0;
+  std::ofstream vtxStream;
+  vtxStream.open("/home/frusso/hep/out/track_densities/truthVertices.txt");
+  for (const auto& particle : allTruthParticles) {
+    if (count % nParticlesPerVertex == 0) {
+      const Acts::Vector4& truthPos = particle.fourPosition();
+      vtxStream << truthPos << "\n";
+    }
+    count++;
+  }
+  vtxStream.close();
   // Get number of generated true primary vertices
   m_nTrueVtx = getNumberOfTruePriVertices(allTruthParticles);
 

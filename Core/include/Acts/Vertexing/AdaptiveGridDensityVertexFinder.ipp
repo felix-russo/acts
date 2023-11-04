@@ -6,10 +6,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-template <int trkGridSize, typename vfitter_t>
-auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
-    const std::vector<const InputTrack_t*>& trackVector,
-    const VertexingOptions<InputTrack_t>& vertexingOptions, State& state) const
+#include <fstream>
+
+template <int spatialTrkGridSize, int temporalTrkGridSize, typename vfitter_t>
+auto Acts::AdaptiveGridDensityVertexFinder<
+    spatialTrkGridSize, temporalTrkGridSize,
+    vfitter_t>::find(const std::vector<const InputTrack_t*>& trackVector,
+                     const VertexingOptions<InputTrack_t>& vertexingOptions,
+                     State& state) const
     -> Result<std::vector<Vertex<InputTrack_t>>> {
   // Remove density contributions from tracks removed from track collection
   if (m_cfg.cacheGridStateForTrackRemoval && state.isInitialized &&
@@ -35,8 +39,14 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
   } else {
     state.mainDensityMap.clear();
     // Fill with track densities
+    std::ofstream paramStream;
+    paramStream.open("/home/frusso/hep/out/track_densities/trackParams.txt");
+    std::ofstream covStream;
+    covStream.open("/home/frusso/hep/out/track_densities/trackCovs.txt");
     for (auto trk : trackVector) {
       const BoundTrackParameters& trkParams = m_extractParameters(*trk);
+      paramStream << trkParams.impactParameters() << "\n";
+      covStream << trkParams.impactParameterCovariance().value() << "\n";
       // Take only tracks that fulfill selection criteria
       if (!doesPassTrackSelection(trkParams)) {
         if (m_cfg.cacheGridStateForTrackRemoval) {
@@ -52,11 +62,17 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
         state.trackSelectionMap[trk] = true;
       }
     }
+    paramStream.close();
+    covStream.close();
     state.isInitialized = true;
+    std::cout << "\nhi\n";
+    saveDensityMap(state,
+                   "/home/frusso/hep/out/track_densities/densities1D.txt");
   }
 
   double z = 0;
-  double width = 0;
+  double t = 0;
+  double zWidth = 0;
   if (!state.mainDensityMap.empty()) {
     if (!m_cfg.estimateSeedWidth) {
       // Get z value of highest density bin
@@ -66,6 +82,7 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
         return maxZTRes.error();
       }
       z = (*maxZTRes).first;
+      t = (*maxZTRes).second;
     } else {
       // Get z value of highest density bin and width
       auto maxZTResAndWidth =
@@ -75,20 +92,22 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
         return maxZTResAndWidth.error();
       }
       z = (*maxZTResAndWidth).first.first;
-      width = (*maxZTResAndWidth).second;
+      t = (*maxZTResAndWidth).first.second;
+      zWidth = (*maxZTResAndWidth).second;
     }
   }
 
   // Construct output vertex
-  Vector3 seedPos = vertexingOptions.constraint.position() + Vector3(0., 0., z);
+  Vector4 seedPos =
+      vertexingOptions.constraint.fullPosition() + Vector4(0., 0., z, t);
 
   Vertex<InputTrack_t> returnVertex = Vertex<InputTrack_t>(seedPos);
 
   SquareMatrix4 seedCov = vertexingOptions.constraint.fullCovariance();
 
-  if (width != 0.) {
+  if (zWidth != 0.) {
     // Use z-constraint from seed width
-    seedCov(2, 2) = width * width;
+    seedCov(2, 2) = zWidth * zWidth;
   }
 
   returnVertex.setFullCovariance(seedCov);
@@ -98,16 +117,36 @@ auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::find(
   return seedVec;
 }
 
-  /// @brief function for saving a DensityMap
-  template <int trkGridSize, typename vfitter_t>
-  void saveDensityMap(std::string path) const {
-    //define ostream
-    returnö
+/// @brief function for saving a DensityMap
+template <int spatialTrkGridSize, int temporalTrkGridSize, typename vfitter_t>
+void Acts::AdaptiveGridDensityVertexFinder<
+    spatialTrkGridSize, temporalTrkGridSize,
+    vfitter_t>::saveDensityMap(const State& state,
+                               const std::string& pathToFile) const {
+  float spatialBinExtent = m_cfg.gridDensity.m_cfg.spatialBinExtent;
+  float temporalBinExtent = m_cfg.gridDensity.m_cfg.temporalBinExtent;
+  std::ofstream outstream;
+  outstream.open(pathToFile);
+  for (const auto& densityEntry : state.mainDensityMap) {
+    Bin bin = densityEntry.first;
+    float trackDensity = densityEntry.second;
+    /*
+    float z = m_cfg.gridDensity.getBinCenter(bin.first, spatialBinExtent);
+    float t = 0.;
+    if (temporalBinExtent > 0.) {
+      t = m_cfg.gridDensity.getBinCenter(bin.second, temporalBinExtent);
+    }
+    */
+    outstream << bin.first << " " << bin.second << " " << trackDensity << "\n";
   }
+  outstream.close();
+}
 
-template <int trkGridSize, typename vfitter_t>
-auto Acts::AdaptiveGridDensityVertexFinder<trkGridSize, vfitter_t>::
-    doesPassTrackSelection(const BoundTrackParameters& trk) const -> bool {
+template <int spatialTrkGridSize, int temporalTrkGridSize, typename vfitter_t>
+auto Acts::AdaptiveGridDensityVertexFinder<
+    spatialTrkGridSize, temporalTrkGridSize,
+    vfitter_t>::doesPassTrackSelection(const BoundTrackParameters& trk) const
+    -> bool {
   // Get required track parameters
   const double d0 = trk.parameters()[BoundIndices::eBoundLoc0];
   const double z0 = trk.parameters()[BoundIndices::eBoundLoc1];

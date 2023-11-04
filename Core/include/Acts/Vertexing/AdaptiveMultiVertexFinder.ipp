@@ -9,6 +9,9 @@
 #include "Acts/Utilities/AlgebraHelpers.hpp"
 #include "Acts/Vertexing/VertexingError.hpp"
 
+#include <fstream>
+#include <string>
+
 template <typename vfitter_t, typename sfinder_t>
 auto Acts::AdaptiveMultiVertexFinder<vfitter_t, sfinder_t>::find(
     const std::vector<const InputTrack_t*>& allTracks,
@@ -18,6 +21,7 @@ auto Acts::AdaptiveMultiVertexFinder<vfitter_t, sfinder_t>::find(
     ACTS_ERROR("Empty track collection handed to find method");
     return VertexingError::EmptyInput;
   }
+
   // Original tracks
   const std::vector<const InputTrack_t*>& origTracks = allTracks;
 
@@ -26,6 +30,53 @@ auto Acts::AdaptiveMultiVertexFinder<vfitter_t, sfinder_t>::find(
 
   FitterState_t fitterState(*m_cfg.bField, vertexingOptions.magFieldContext);
   SeedFinderState_t seedFinderState;
+
+  // Load truth vertices
+  std::vector<Vertex<InputTrack_t>> truthVertices;
+  std::string pathToFolder = "/home/frusso/hep/out/track_densities/";
+  std::ifstream vtcsStream(pathToFolder + "truthVertices.txt");
+  std::string line;
+  unsigned int cnt = 0;
+  Vector4 vtxPos;
+  while (std::getline(vtcsStream, line)) {
+    unsigned int ind = cnt % 4;
+    vtxPos[ind] = std::stod(line);
+    if (ind == 3) {
+      truthVertices.emplace_back(vtxPos);
+    }
+    cnt++;
+  }
+
+  // Calculate compatibilities
+  std::vector<bool> useTimes(true, false);
+  for (const auto useTime : useTimes) {
+    std::ofstream compStream;
+    if (useTime) {
+      compStream.open(pathToFolder + "compatibilitiesWithTime.txt");
+    } else {
+      compStream.open(pathToFolder + "compatibilities.txt");
+    }
+    for (const auto& vtx : truthVertices) {
+      for (const auto& trk : allTracks) {
+        auto ip = m_cfg.ipEstimator.estimate3DImpactParameters(
+            vertexingOptions.geoContext, vertexingOptions.magFieldContext,
+            m_extractParameters(*trk), vtx.position(), fitterState.ipState);
+        Acts::Result<double> compatibilityResult(0.);
+        if (useTime) {
+          compatibilityResult =
+              m_cfg.ipEstimator.template getVertexCompatibility<4>(
+                  vertexingOptions.geoContext, &(ip.value()),
+                  vtx.fullPosition());
+        } else {
+          compatibilityResult =
+              m_cfg.ipEstimator.template getVertexCompatibility<3>(
+                  vertexingOptions.geoContext, &(ip.value()), vtx.position());
+        }
+        compStream << compatibilityResult.value() << "\n";
+      }
+    }
+    compStream.close();
+  }
 
   std::vector<std::unique_ptr<Vertex<InputTrack_t>>> allVertices;
 

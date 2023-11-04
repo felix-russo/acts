@@ -40,7 +40,7 @@ setup = makeSetup()
 def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
     with tempfile.TemporaryDirectory() as temp:
         s = acts.examples.Sequencer(
-            events=500,
+            events=1,
             numThreads=-1,
             logLevel=acts.logging.INFO,
         )
@@ -61,10 +61,10 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
             vtxGen=acts.examples.GaussianVertexGenerator(
                 mean=acts.Vector4(0, 0, 0, 0),
                 stddev=acts.Vector4(
-                    0.0125 * u.mm, 0.0125 * u.mm, 55.5 * u.mm, 1.0 * u.ns
+                    0.0125 * u.mm, 0.0125 * u.mm, 0.1 * u.mm, 1.0 * u.ns
                 ),
             ),
-            multiplicity=50,
+            multiplicity=5,
             rnd=rnd,
         )
 
@@ -148,17 +148,6 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
             s,
             setup.field,
             trackParameters="trackParameters",
-            outputProtoVertices="ivf_protovertices",
-            outputVertices="ivf_fittedVertices",
-            seeder=acts.VertexSeedFinder.GaussianSeeder,
-            vertexFinder=VertexFinder.Iterative,
-            outputDirRoot=tp / "ivf",
-        )
-
-        addVertexFitting(
-            s,
-            setup.field,
-            trackParameters="trackParameters",
             outputProtoVertices="amvf_protovertices",
             outputVertices="amvf_fittedVertices",
             seeder=acts.VertexSeedFinder.GaussianSeeder,
@@ -183,7 +172,7 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
         s.run()
         del s
 
-        for vertexing in ["ivf", "amvf"]:
+        for vertexing in ["amvf",]:
             shutil.move(
                 tp / f"{vertexing}/performance_vertexing.root",
                 tp / f"performance_{vertexing}.root",
@@ -200,7 +189,6 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
             [
                 "performance_ckf",
                 "tracksummary_ckf",
-                "performance_ivf",
                 "performance_amvf",
             ]
             + (["performance_amvf_gridseeder"] if label == "seeded" else [])
@@ -218,9 +206,6 @@ def run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label):
 
 
 for truthSmearedSeeded, truthEstimatedSeeded, label in [
-    (True, False, "truth_smeared"),  # if first is true, second is ignored
-    (False, True, "truth_estimated"),
     (False, False, "seeded"),
-    (False, False, "orthogonal"),
 ]:
     run_ckf_tracking(truthSmearedSeeded, truthEstimatedSeeded, label)

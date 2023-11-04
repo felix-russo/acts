@@ -215,6 +215,7 @@ class AdaptiveGridTrackDensity {
   /// @return The density sum
   float getDensitySum(const DensityMap& densityMap, const Bin& bin) const;
 
+ public:
   Config m_cfg;
 };
 
