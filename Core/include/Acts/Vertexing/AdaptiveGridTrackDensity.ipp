@@ -9,6 +9,7 @@
 #include "Acts/Vertexing/VertexingError.hpp"
 
 #include <algorithm>
+#include <fstream>
 
 template <int spatialTrkGridSize, int temporalTrkGridSize>
 float Acts::AdaptiveGridTrackDensity<
@@ -99,6 +100,15 @@ Acts::AdaptiveGridTrackDensity<spatialTrkGridSize, temporalTrkGridSize>::
              DensityMap& mainDensityMap) const {
   ActsVector<3> impactParams = trk.impactParameters();
   ActsSquareMatrix<3> cov = trk.impactParameterCovariance().value();
+  std::ofstream outStreamCov("/home/frusso/hep/out/gaussian_plot/cov.txt",
+                             std::ios::app);
+  outStreamCov << cov << "\n";
+  outStreamCov.close();
+
+  std::ofstream outStreamIP("/home/frusso/hep/out/gaussian_plot/ip.txt",
+                            std::ios::app);
+  outStreamIP << impactParams << "\n";
+  outStreamIP.close();
 
   // Calculate bin in d direction
   int centralDBin = getBin(impactParams(0), m_cfg.spatialBinExtent);
