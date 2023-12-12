@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <random>
 #include <tuple>
@@ -190,13 +191,19 @@ BOOST_AUTO_TEST_CASE(linearized_track_factory_test) {
   StraightNumericalLinearizer::State numStraightLinState(
       zeroField->makeCache(magFieldContext));
 
+  // Streams for saving Jacobians
+  std::string folder = "/home/frusso/hep/out/JacobianComparison/";
+  std::ofstream numericalAStream(folder + "A_numerical.txt");
+  std::ofstream analyticalAStream(folder + "A_analytical.txt");
+
   // Lambda for comparing outputs of the two linearization methods
   // We compare the linearization result at the PCA to "linPoint"
-  auto checkLinearizers = [](auto& lin1, auto& linState1, auto& lin2,
-                             auto& linState2, const BoundTrackParameters& track,
-                             const Vector4& linPoint,
-                             const auto& geometryContext,
-                             const auto& fieldContext) {
+  auto checkLinearizers = [&](auto& lin1, auto& linState1, auto& lin2,
+                              auto& linState2,
+                              const BoundTrackParameters& track,
+                              const Vector4& linPoint,
+                              const auto& geometryContext,
+                              const auto& fieldContext) {
     // In addition to comparing the output of the linearizers, we check that
     // they return non-zero quantities
     BoundVector vecBoundZero = BoundVector::Zero();
@@ -235,6 +242,10 @@ BOOST_AUTO_TEST_CASE(linearized_track_factory_test) {
     // Compare position Jacobians
     CHECK_CLOSE_OR_SMALL((linTrack1.positionJacobian),
                          (linTrack2.positionJacobian), relTol, small);
+
+    analyticalAStream << linTrack1.positionJacobian << "\n";
+    numericalAStream << linTrack2.positionJacobian << "\n";
+
     BOOST_CHECK_NE(linTrack1.positionJacobian, matBound2SPZero);
     BOOST_CHECK_NE(linTrack2.positionJacobian, matBound2SPZero);
 
@@ -268,12 +279,9 @@ BOOST_AUTO_TEST_CASE(linearized_track_factory_test) {
       checkLinearizers(linFactory, linState, numLinFactory, numLinState, trk,
                        vtxPos, geoContext, magFieldContext);
     }
-    BOOST_TEST_CONTEXT("Linearization without magnetic field") {
-      checkLinearizers(straightLinFactory, straightLinState,
-                       numStraightLinFactory, numStraightLinState, trk, vtxPos,
-                       geoContext, magFieldContext);
-    }
   }
+  numericalAStream.close();
+  analyticalAStream.close();
 }
 
 }  // namespace Test
